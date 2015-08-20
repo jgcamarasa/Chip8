@@ -1,0 +1,6 @@
+*.pdb
+*.ilk
+*.exe
+Chip8/Debug/
+*.sdf
+Chip8.v12.suo

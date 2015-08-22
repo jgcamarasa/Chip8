@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <time.h>
 
 typedef unsigned int uint32;
 typedef unsigned char byte;
@@ -20,6 +21,11 @@ typedef unsigned char byte;
 #define OP_SETV(X, NN) ((0x6000 | NN) | (X << 8))
 #define OP_ADDV(X, NN) ((0x7000 | NN) | (X << 8))
 #define OP_ARI(X, Y, op) ((0x8000 | X << 8) | (Y << 4) | (op))
+#define OP_SKIP_NEQ2(X, Y) ((0x9000 | X << 8) | (Y << 4))
+#define OP_SETI(NNN) (0xA000 | NNN)
+#define OP_JMP2(NNN) (0xB000 | NNN)
+#define OP_RND(X, NN) ((0xC000 | NN) | (X << 8))
+#define OP_DRW(X, Y, N) ((0xD000 | X << 8) | (Y << 4) | (N))
 #define PROGRAM_END 0x0000
 
 void testOpWrite()
@@ -67,15 +73,35 @@ void testOpWrite()
 		printf("OP_ARI test failed\n");
 		assert(false);
 	}
+	if (OP_SKIP_NEQ2(2, 4) != 0x9240)
+	{
+		printf("OP_SKIP_NEQ2 test failed\n");
+		assert(false);
+	}
+	if (OP_SETI(0x340) != 0xA340)
+	{
+		printf("OP_SETI test failed\n");
+		assert(false);
+	}
 }
 
 uint32 program[] = {
 	OP_CLS,
-	OP_SETV(0, 0xFF),
-	OP_SETV(1, 0x01),
-	OP_ARI(0, 1, 4),
-	OP_SKIP_EQ(0, 0x00),
-	OP_JMP(0x200),
+	OP_SETV(0x1, 0x08),
+	OP_SETV(0x2, 0x10),
+	OP_SETV(0x3, 0x18),
+	OP_SETV(0x4, 0x20),
+	OP_SETI(0x00B*5),		// Sprite 'B'
+	OP_DRW(0x0, 0x0, 0x5),	// Draw at 0,0
+	OP_SETI(0x000 * 5),
+	OP_DRW(0x1, 0x0, 0x5), 
+	OP_SETI(0x000 * 5),
+	OP_DRW(0x2, 0x0, 0x5),
+	OP_SETI(0x00B * 5),
+	OP_DRW(0x3, 0x0, 0x5),
+	OP_SETI(0x005 * 5),
+	OP_DRW(0x4, 0x0, 0x5), 
+	OP_JMP(0x202),
 	PROGRAM_END
 };
 
@@ -84,13 +110,37 @@ struct State
 	byte memory[MAX_MEMORY];
 	byte V[16];				// V0-VF, Registers (8 bits). VF = Carry Flag
 	byte stack[64];			// Stack
-	byte I[2];				// Address register (16 bits)
+	uint32 I;				// Address register (16 bits)
 	byte delayTimer;		// Delay timer TODO: Check if it's a byte or what
 	byte soundTimer;		// Sound timer
 	byte keyboard[16];		// Hex Keyboard. Keys from 0 to F
 	byte display[DISPLAY_W*DISPLAY_H];	// Byte used as a bool for each pixel
 	uint32 PC;				// Program counter
 };
+
+byte sprites[16 * 5] = {
+	0xF0, 0x90, 0x90, 0x90, 0xF0,
+	0x20, 0x60, 0x20, 0x20, 0x70,
+	0xF0, 0x10, 0xF0, 0x80, 0xF0,
+	0xF0, 0x10, 0xF0, 0x10, 0xF0,
+	0x90, 0x90, 0xF0, 0x10, 0x10,
+	0xF0, 0x80, 0xF0, 0x10, 0xF0,
+	0xF0, 0x80, 0xF0, 0x90, 0xF0,
+	0xF0, 0x10, 0x20, 0x30, 0x40,
+	0xF0, 0x90, 0xF0, 0x90, 0xF0,
+	0xF0, 0x90, 0xF0, 0x10, 0xF0,
+	0xF0, 0x90, 0xF0, 0x90, 0x90,
+	0xE0, 0x90, 0xE0, 0x90, 0xE0,
+	0xF0, 0x80, 0x80, 0x80, 0xF0,
+	0xE0, 0x90, 0x90, 0x90, 0xE0,
+	0xF0, 0x80, 0xF0, 0x80, 0xF0,
+	0xF0, 0x80, 0xF0, 0x80, 0x80
+};
+
+void loadSprites(State *state)
+{
+	memcpy(state->memory, sprites, 16 * 5);
+}
 
 void writeOpToMemory(void* dst, uint32 op)
 {
@@ -123,6 +173,7 @@ void loadDefaultProgram(byte* dst)
 
 void renderDisplay(byte *display)
 {
+	system("cls");
 	for (uint32 y = 0; y < DISPLAY_H; ++y)
 	{
 		for (uint32 x = 0; x < DISPLAY_W; ++x)
@@ -273,6 +324,7 @@ void processOpType8(uint32 op, State *state)
 
 void processOpType9(uint32 op, State *state)
 {
+	// 0x9XY0 - Skips the next instruction if VX doesn't equal VY.
 	uint32 X = op & 0x0F00;
 	X = X >> 8;
 	uint32 Y = op & 0x00F0;
@@ -284,22 +336,26 @@ void processOpType9(uint32 op, State *state)
 void processOpTypeA(uint32 op, State *state)
 {
 	// 0xANNN - Sets I to the address NNN.
-	printf("Instruction of type A not supported: %#010x\n", op);
-	assert(false);
+	uint32 address = op & 0x0FFF;
+	state->I = address;
 }
 
 void processOpTypeB(uint32 op, State *state)
 {
 	// 0xBNNN - Jumps to the address NNN plus V0.
-	printf("Instruction of type B not supported: %#010x\n", op);
-	assert(false);
+	uint32 address = op & 0x0FFF;
+	state->PC = address + state->V[0];
 }
 
 void processOpTypeC(uint32 op, State *state)
 {
 	// 0xCXNN - Sets VX to the result of a bitwise and operation on a random number and NN.
-	printf("Instruction of type C not supported: %#010x\n", op);
-	assert(false);
+	uint32 X = op & 0x0F00;
+	X = X >> 8;
+	uint32 value = op & 0x00FF;
+	uint32 r = rand();
+	r &= 0x00FF; // Just in case
+	state->V[X] = value & r;
 }
 
 void processOpTypeD(uint32 op, State *state)
@@ -310,15 +366,53 @@ void processOpTypeD(uint32 op, State *state)
 	//			drawing (i.e. it toggles the screen pixels). Sprites are drawn starting 
 	//			at position VX, VY. N is the number of 8bit rows that need to be drawn. 
 	//			If N is greater than 1, second line continues at position VX, VY+1, and so on.
-	printf("Instruction of type D not supported: %#010x\n", op);
-	assert(false);
+	uint32 X = op & 0x0F00;
+	X = X >> 8;
+	uint32 Y = op & 0x00F0;
+	Y = Y >> 4;
+	byte *address = state->memory + state->I;
+	uint32 rows = op & 0x000F;
+	byte posX = state->V[X];
+	byte posY = state->V[Y];
+	byte changed = 0;
+	for (uint32 i = 0; i < rows; ++i)
+	{
+		byte toDraw = *address; // Here we have the byte to draw in a row
+		for (int p = 7; p >= 0; --p)
+		{
+			uint32 index = posY*DISPLAY_W + posX;
+			byte pixel = toDraw >> p;
+			pixel &= 0x01;
+			changed |= pixel & state->display[index];
+			state->display[index] ^= pixel;
+			++posX;
+		}
+		posX -= 8;
+		++posY;
+		++address;
+	}
+	state->V[0xF] = changed;
 }
 
 void processOpTypeE(uint32 op, State *state)
 {
-	// 0xE??? - Skips
-	printf("Instruction of type E not supported: %#010x\n", op);
-	assert(false);
+	// 0xE??? - Keyboard skips
+	uint32 X = op & 0x0F00;
+	X = X >> 8;
+	uint32 subtype = op & 0x00FF;
+	byte key = state->keyboard[state->V[X]];
+	switch (subtype)
+	{
+	case 0x9E: // Skips the next instruction if the key stored in VX is pressed.
+		state->PC += 2 * key;
+		break;
+	case 0xA1: // Skips the next instruction if the key stored in VX isn't pressed.
+		state->PC += 2 * !key;
+		break;
+	default:
+		printf("Instruction of type E not supported: %#010x\n", op);
+		assert(false);
+	}
 }
 
 void processOpTypeF(uint32 op, State *state)
@@ -335,8 +429,10 @@ int main()
 	State state;
 	
 	// Initialization
+	srand(time(NULL));
 	memset(state.memory, 0, MAX_MEMORY);
 	memset(state.V, 0, 16);
+	loadSprites(&state);
 	state.PC = 0x200; // Starts at 512
 	loadDefaultProgram(state.memory + state.PC);
 

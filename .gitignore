@@ -5,3 +5,7 @@ Chip8/Debug/
 *.sdf
 Chip8.v12.suo
 Chip8.opensdf
+Chip8/Chip8.vcxproj.user
+*.obj
+*.log
+*.tlog

@@ -35,6 +35,72 @@ void loadSprites(State *state)
 	memcpy(state->memory, sprites, 16 * 5);
 }
 
+uint32 doStep(State *state)
+{
+	uint32 op;
+	readInstruction(&op, state->memory + state->PC);
+	state->PC += 2; // Should increment this before or after?
+
+	uint32 opType;
+	getOpType(&opType, op);
+	switch (opType)
+	{
+	case 0x0000:
+		processOpType0(op, state);
+		break;
+	case 0x1000:
+		processOpType1(op, state);
+		break;
+	case 0x2000:
+		processOpType2(op, state);
+		break;
+	case 0x3000:
+		processOpType3(op, state);
+		break;
+	case 0x4000:
+		processOpType4(op, state);
+		break;
+	case 0x5000:
+		processOpType5(op, state);
+		break;
+	case 0x6000:
+		processOpType6(op, state);
+		break;
+	case 0x7000:
+		processOpType7(op, state);
+		break;
+	case 0x8000:
+		processOpType8(op, state);
+		break;
+	case 0x9000:
+		processOpType9(op, state);
+		break;
+	case 0xA000:
+		processOpTypeA(op, state);
+		break;
+	case 0xB000:
+		processOpTypeB(op, state);
+		break;
+	case 0xC00:
+		processOpTypeC(op, state);
+		break;
+	case 0xD000:
+		processOpTypeD(op, state);
+		break;
+	case 0xE000:
+		processOpTypeE(op, state);
+		break;
+	case 0xF000:
+		processOpTypeF(op, state);
+		break;
+	default:
+		printf("Unsupported instruction type: %#010x\n", opType);
+		break;
+	}
+
+	return op;
+}
+
 void writeOpToMemory(void* dst, uint32 op)
 {
 	uint32 *address = (uint32*)dst;

@@ -48,6 +48,8 @@ void initState(State *state);
 
 void loadSprites(State *state);
 
+uint32 doStep(State *state);
+
 void writeOpToMemory(void* dst, uint32 op);
 
 void readInstruction(uint32 *dst, byte *src);

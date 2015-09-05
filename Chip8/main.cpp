@@ -2,26 +2,22 @@
 
 #include "emulator.h"
 
-#define DISPLAY_FACTOR 2
+#define DISPLAY_FACTOR 8
 
 void renderState(State *state)
 {
-	byte data[DISPLAY_W * DISPLAY_H * DISPLAY_FACTOR * DISPLAY_FACTOR];
-	for (uint32 y = 0; y < DISPLAY_H; ++y)
+	const int outputW = DISPLAY_W * DISPLAY_FACTOR;
+	const int outputH = DISPLAY_H * DISPLAY_FACTOR;
+	const int inputSize = DISPLAY_W * DISPLAY_H;
+	const int outputSize = outputW * outputH;
+	byte data[outputSize];
+	for (int y = 0; y < outputH; ++y)
 	{
-		for (uint32 x = 0; x < DISPLAY_W; ++x)
+		for (int x = 0; x < outputW; ++x)
 		{
-			uint32 srcPos = y*DISPLAY_W + x;
-			byte value = state->display[srcPos] * 255;
-			for (int i = 0; i < DISPLAY_FACTOR; ++i)
-			{
-				for (int j = 0; j < DISPLAY_FACTOR; ++j)
-				{
-					uint32 destPos = srcPos * DISPLAY_FACTOR + i + DISPLAY_W * DISPLAY_FACTOR * j;
-					data[destPos] = value;
-				}
-			}
-
+			int srcX = x / DISPLAY_FACTOR;
+			int srcY = DISPLAY_H - y / DISPLAY_FACTOR -1;
+			data[x + y * outputW] = state->display[srcX + srcY * DISPLAY_W] * 255;
 		}
 	}
 	glDrawPixels(DISPLAY_W * DISPLAY_FACTOR, DISPLAY_H * DISPLAY_FACTOR, GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
@@ -41,77 +37,15 @@ int main()
 	glfwMakeContextCurrent(window);
 
 	int exit = 0;
-	while (!exit)
+	while (!exit && !glfwWindowShouldClose(window))
 	{
-		uint32 op;
-		readInstruction(&op, state.memory + state.PC);
-		state.PC += 2; // Should increment this before or after?
-		
-		uint32 opType;
-		getOpType(&opType, op);
-		switch (opType)
-		{
-		case 0x0000:
-			processOpType0(op, &state);
-			break;
-		case 0x1000:
-			processOpType1(op, &state);
-			break;
-		case 0x2000:
-			processOpType2(op, &state);
-			break;
-		case 0x3000:
-			processOpType3(op, &state);
-			break;
-		case 0x4000:
-			processOpType4(op, &state);
-			break;
-		case 0x5000:
-			processOpType5(op, &state);
-			break;
-		case 0x6000:
-			processOpType6(op, &state);
-			break;
-		case 0x7000:
-			processOpType7(op, &state);
-			break;
-		case 0x8000:
-			processOpType8(op, &state);
-			break;
-		case 0x9000:
-			processOpType9(op, &state);
-			break;
-		case 0xA000:
-			processOpTypeA(op, &state);
-			break;
-		case 0xB000:
-			processOpTypeB(op, &state);
-			break;
-		case 0xC00:
-			processOpTypeC(op, &state);
-			break;
-		case 0xD000:
-			processOpTypeD(op, &state);
-			break;
-		case 0xE000:
-			processOpTypeE(op, &state);
-			break;
-		case 0xF000:
-			processOpTypeF(op, &state);
-			break;
-		default:
-			printf("Unsupported instruction type: %#010x\n", opType);
-			break;
-		}
-
-		//printDisplay(state.display);
+		uint32 op = doStep(&state);
 		renderState(&state);
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
 		exit = (op == PROGRAM_END);
 	}
-
-	system("pause");
 	return 0;
 }

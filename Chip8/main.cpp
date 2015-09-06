@@ -23,9 +23,25 @@ void renderState(State *state)
 	glDrawPixels(DISPLAY_W * DISPLAY_FACTOR, DISPLAY_H * DISPLAY_FACTOR, GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
 }
 
-byte keyboard[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-
+void updateStateKeyboard(State *state, GLFWwindow *window)
+{
+	state->keyboard[0] = glfwGetKey(window, GLFW_KEY_1);
+	state->keyboard[1] = glfwGetKey(window, GLFW_KEY_2);
+	state->keyboard[2] = glfwGetKey(window, GLFW_KEY_3);
+	state->keyboard[3] = glfwGetKey(window, GLFW_KEY_4);
+	state->keyboard[4] = glfwGetKey(window, GLFW_KEY_Q);
+	state->keyboard[5] = glfwGetKey(window, GLFW_KEY_W);
+	state->keyboard[6] = glfwGetKey(window, GLFW_KEY_E);
+	state->keyboard[7] = glfwGetKey(window, GLFW_KEY_R);
+	state->keyboard[8] = glfwGetKey(window, GLFW_KEY_A);
+	state->keyboard[9] = glfwGetKey(window, GLFW_KEY_S);
+	state->keyboard[10] = glfwGetKey(window, GLFW_KEY_D);
+	state->keyboard[11] = glfwGetKey(window, GLFW_KEY_F);
+	state->keyboard[12] = glfwGetKey(window, GLFW_KEY_Z);
+	state->keyboard[13] = glfwGetKey(window, GLFW_KEY_X);
+	state->keyboard[14] = glfwGetKey(window, GLFW_KEY_C);
+	state->keyboard[15] = glfwGetKey(window, GLFW_KEY_V);
+}
 
 int main()
 {
@@ -39,7 +55,6 @@ int main()
 	GLFWwindow* window = glfwCreateWindow(DISPLAY_W * DISPLAY_FACTOR, DISPLAY_H * DISPLAY_FACTOR, "Castor-8", NULL, NULL);
 	assert(window != NULL);
 	glfwMakeContextCurrent(window);
-	glfwSetKeyCallback(window, key_callback);
 
 	// State timer
 	double stateTimer = 0.0f;
@@ -56,11 +71,12 @@ int main()
 		QueryPerformanceCounter(&t1);
 
 #define TIMER_PERIOD_MILLI (1 / 60) * 1000
-		if (elapsedTime > TIMER_PERIOD_MILLI)
+		if (stateTimer > TIMER_PERIOD_MILLI)
 		{
 			updateTimers(&state);
-			elapsedTime -= TIMER_PERIOD_MILLI;
+			stateTimer -= TIMER_PERIOD_MILLI;
 		}
+		updateStateKeyboard(&state, window);
 		uint32 op = doStep(&state);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -1,5 +1,7 @@
 #include "emulator.h"
 
+#define NO_KEY 255
+
 void initState(State *state)
 {
 	srand(time(NULL));
@@ -81,7 +83,7 @@ uint32 doStep(State *state)
 	case 0xB000:
 		processOpTypeB(op, state);
 		break;
-	case 0xC00:
+	case 0xC000:
 		processOpTypeC(op, state);
 		break;
 	case 0xD000:
@@ -98,6 +100,7 @@ uint32 doStep(State *state)
 		break;
 	}
 
+	printf("%#010x\n", op);
 	return op;
 }
 
@@ -407,6 +410,19 @@ void processOpTypeE(uint32 op, State *state)
 	}
 }
 
+byte getFirstKeyPressed(State *state)
+{
+	for (int i = 0; i < 15; ++i)
+	{
+		if (state->keyboard[i])
+		{
+			return i;
+		}
+	}
+
+	return NO_KEY;
+}
+
 void processOpTypeF(uint32 op, State *state)
 {
 	uint32 X = op & 0x0F00;
@@ -421,8 +437,15 @@ void processOpTypeF(uint32 op, State *state)
 		state->V[X] = state->delayTimer;
 		break;
 	case 0x0A: // A key press is awaited, and then stored in VX.
-		printf("Instruction of type F not supported: %#010x\n", op);
-		assert(false);
+		temp = getFirstKeyPressed(state);
+		if (temp == NO_KEY)
+		{
+			state->PC -= 2; // Waiting for keyboard, let's repeat the same instruction again
+		}
+		else
+		{
+			state->V[X] = temp;
+		}
 		break;
 	case 0x15: // Sets the delay timer to VX.
 		state->delayTimer = state->V[X];

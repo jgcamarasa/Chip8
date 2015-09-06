@@ -48,7 +48,9 @@ void initState(State *state);
 
 void loadSprites(State *state);
 
-uint32 doStep(State *state);
+uint32 doStep(State *state); // returns current instruction
+
+void updateTimers(State *state);
 
 void writeOpToMemory(void* dst, uint32 op);
 

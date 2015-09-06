@@ -1,5 +1,5 @@
 #include "GLFW\glfw3.h"
-
+#include <Windows.h>
 #include "emulator.h"
 
 #define DISPLAY_FACTOR 8
@@ -23,6 +23,10 @@ void renderState(State *state)
 	glDrawPixels(DISPLAY_W * DISPLAY_FACTOR, DISPLAY_H * DISPLAY_FACTOR, GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
 }
 
+byte keyboard[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+
+
 int main()
 {
 	State state;
@@ -35,15 +39,41 @@ int main()
 	GLFWwindow* window = glfwCreateWindow(DISPLAY_W * DISPLAY_FACTOR, DISPLAY_H * DISPLAY_FACTOR, "Castor-8", NULL, NULL);
 	assert(window != NULL);
 	glfwMakeContextCurrent(window);
+	glfwSetKeyCallback(window, key_callback);
+
+	// State timer
+	double stateTimer = 0.0f;
 
 	int exit = 0;
 	while (!exit && !glfwWindowShouldClose(window))
 	{
-		uint32 op = doStep(&state);
-		renderState(&state);
+		LARGE_INTEGER frequency;        // ticks per second
+		LARGE_INTEGER t1, t2;           // ticks
+		double elapsedTime;
 
+		// get ticks per second
+		QueryPerformanceFrequency(&frequency);
+		QueryPerformanceCounter(&t1);
+
+#define TIMER_PERIOD_MILLI (1 / 60) * 1000
+		if (elapsedTime > TIMER_PERIOD_MILLI)
+		{
+			updateTimers(&state);
+			elapsedTime -= TIMER_PERIOD_MILLI;
+		}
+		uint32 op = doStep(&state);
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		renderState(&state);
 		glfwSwapBuffers(window);
+
 		glfwPollEvents();
+
+		// stop timer
+		QueryPerformanceCounter(&t2);
+		elapsedTime = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
+
+		stateTimer += elapsedTime;
 
 		exit = (op == PROGRAM_END);
 	}

@@ -101,6 +101,18 @@ uint32 doStep(State *state)
 	return op;
 }
 
+void updateTimers(State *state)
+{
+	if (state->delayTimer > 0)
+	{
+		--state->delayTimer;
+	}
+	if (state->soundTimer > 0)
+	{
+		--state->soundTimer;
+	}
+}
+
 void writeOpToMemory(void* dst, uint32 op)
 {
 	uint32 *address = (uint32*)dst;
@@ -408,9 +420,9 @@ void processOpTypeF(uint32 op, State *state)
 	case 0x07: // Sets VX to the value of the delay timer.
 		state->V[X] = state->delayTimer;
 		break;
-	case 0x0A: // Sets VX to the value of the delay timer.
+	case 0x0A: // A key press is awaited, and then stored in VX.
 		printf("Instruction of type F not supported: %#010x\n", op);
-		//assert(false);
+		assert(false);
 		break;
 	case 0x15: // Sets the delay timer to VX.
 		state->delayTimer = state->V[X];

@@ -100,7 +100,6 @@ uint32 doStep(State *state)
 		break;
 	}
 
-	printf("%#010x\n", op);
 	return op;
 }
 

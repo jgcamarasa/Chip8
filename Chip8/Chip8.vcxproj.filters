@@ -36,6 +36,9 @@
     <ClCompile Include="imgui_impl_glfw.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
+    <ClCompile Include="gui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="emulator.h">
@@ -61,6 +64,9 @@
     </ClInclude>
     <ClInclude Include="imgui_impl_glfw.h">
       <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="gui.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

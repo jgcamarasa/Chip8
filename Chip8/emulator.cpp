@@ -477,13 +477,13 @@ void processOpTypeF(uint32 op, State *state)
 		state->memory[state->I + 2] = digit;
 		break;
 	case 0x55: // Stores V0 to VX in memory starting at address I.
-		for (uint32 i = 0; i < X; i++)
+		for (uint32 i = 0; i <= X; i++)
 		{
 			state->memory[state->I + i] = state->V[i];
 		}
 		break;
 	case 0x65: // Fills V0 to VX with values from memory starting at address I.
-		for (uint32 i = 0; i < X; i++)
+		for (uint32 i = 0; i <= X; i++)
 		{
 			state->V[i] = state->memory[state->I + i];
 		}

@@ -3,13 +3,7 @@
 #include "imgui_impl_glfw.h"
 #include <Windows.h>
 #include "emulator.h"
-
-#define DISPLAY_FACTOR 8
-
-#define SIDE_PANEL_W 200
-#define SIDE_PANEL_EXTRA_H 0
-#define WIN_W DISPLAY_W * DISPLAY_FACTOR + SIDE_PANEL_W
-#define WIN_H DISPLAY_H * DISPLAY_FACTOR + SIDE_PANEL_EXTRA_H + 200
+#include "gui.h"
 
 void renderState(State *state)
 {
@@ -51,63 +45,12 @@ void updateStateKeyboard(State *state, GLFWwindow *window)
 	state->keyboard[15] = glfwGetKey(window, GLFW_KEY_V);
 }
 
-void drawGUI(State *state)
-{
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::SetNextWindowSize(ImVec2(SIDE_PANEL_W, WIN_H), ImGuiSetCond_FirstUseEver);
-	ImGui::SetNextWindowPos(ImVec2(WIN_W - SIDE_PANEL_W, 0));
-	ImGui::Begin("Another Window", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
-	ImGui::Text("PC: %#010x", state->PC);
-	uint32 op;
-	readInstruction(&op, state->memory + state->PC);
-	ImGui::Text("Op: %#06x", op);
-	ImGui::Separator();
-	ImGui::Text("Registers:");
-	ImGui::Columns(2);
-	ImGui::Text("0:   %d", (int)state->V[0]);
-	ImGui::Text("1:   %d", (int)state->V[1]);
-	ImGui::Text("2:   %d", (int)state->V[2]);
-	ImGui::Text("3:   %d", (int)state->V[3]);
-	ImGui::Text("4:   %d", (int)state->V[4]);
-	ImGui::Text("5:   %d", (int)state->V[5]);
-	ImGui::Text("6:   %d", (int)state->V[6]);
-	ImGui::Text("7:   %d", (int)state->V[7]);
-	ImGui::NextColumn();
-	ImGui::Text("8:   %d", (int)state->V[8]);
-	ImGui::Text("9:   %d", (int)state->V[9]);
-	ImGui::Text("10:  %d", (int)state->V[10]);
-	ImGui::Text("11:  %d", (int)state->V[11]);
-	ImGui::Text("12:  %d", (int)state->V[12]);
-	ImGui::Text("13:  %d", (int)state->V[13]);
-	ImGui::Text("14:  %d", (int)state->V[14]);
-	ImGui::Text("15:  %d", (int)state->V[15]);
-	ImGui::Columns(1);
-	ImGui::Separator();
-	ImGui::Button("Pause");
-	ImGui::SameLine();
-	ImGui::Button("Step");
-	ImGui::Text("State: Running");
-	ImGui::End();
-
-	ImGui::SetNextWindowSize(ImVec2(WIN_W - SIDE_PANEL_W, 200), ImGuiSetCond_FirstUseEver);
-	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::SetNextWindowContentSize(ImVec2(WIN_W - SIDE_PANEL_W, 200));
-	ImGui::Begin("Log", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-	ImGui::BeginChildFrame(0, ImVec2(WIN_W - SIDE_PANEL_W, 160));
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::Text("Logging...");
-	ImGui::EndChildFrame();
-	ImGui::End();
-}
-
 int main()
 {
 	State state;
+	Controller controller;
+	controller.status = CONTROLLER_STATUS_PAUSED;
+	controller.state = &state;
 	
 	initState(&state);
 	loadProgramFromFile("rndtest.ch8", &state);
@@ -144,9 +87,14 @@ int main()
 			stateTimer -= TIMER_PERIOD_MILLI;
 		}
 		updateStateKeyboard(&state, window);
-		uint32 op = doStep(&state);
 
-		drawGUI(&state);
+		uint32 op;
+		if (controller.status == CONTROLLER_STATUS_RUNNING)
+		{
+			op = doStep(&state);
+		}
+
+		drawGUI(&state, &controller);
 
 		// Rendering
 		int display_w, display_h;
@@ -163,8 +111,6 @@ int main()
 		elapsedTime = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
 
 		stateTimer += elapsedTime;
-
-		exit = (op == PROGRAM_END);
 	}
 
 	ImGui_ImplGlfw_Shutdown();

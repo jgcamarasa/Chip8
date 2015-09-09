@@ -403,6 +403,10 @@ void processOpTypeD(uint32 op, State *state)
 			++posX;
 		}
 		++posY;
+		if (posY >= 32)
+		{
+			posY = 0;
+		}
 		++address;
 	}
 	state->V[0xF] = changed;

@@ -473,9 +473,7 @@ void processOpTypeF(uint32 op, State *state)
 		state->soundTimer = state->V[X];
 		break;
 	case 0x1E: // Adds VX to I
-		temp = state->V[X];
-		state->V[X] = temp + state->I;
-		state->V[0xF] = temp > state->V[X];
+		state->I += state->V[X];
 		break;
 	case 0x29: // Sets I to the location of the sprite for the character in VX. 
 		// Characters 0-F (in hexadecimal) are represented by a 4x5 font.

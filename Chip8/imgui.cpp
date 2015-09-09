@@ -1798,7 +1798,7 @@ void ImGui::NewFrame()
         new(g.LogClipboard) ImGuiTextBuffer();
 
         IM_ASSERT(g.Settings.empty());
-        LoadSettings();
+        //LoadSettings();
         g.Initialized = true;
     }
 

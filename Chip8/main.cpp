@@ -53,7 +53,7 @@ int main()
 	controller.state = &state;
 	
 	initState(&state);
-	loadProgramFromFile("rndtest.ch8", &state);
+	loadProgramFromFile("airplane.ch8", &state);
 
 	// Window creation
 	glfwInit();

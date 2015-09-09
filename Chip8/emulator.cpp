@@ -11,6 +11,8 @@ void initState(State *state)
 	clearDisplay(state->display);
 	loadSprites(state);
 	state->PC = 0x200; // Starts at 512
+	memset(state->modifiedAddresses, 0xFFFFFFFF, 16 * sizeof(uint32));
+	state->modifiedAddressesCount = 0;
 }
 
 byte sprites[16 * 5] = {
@@ -21,7 +23,7 @@ byte sprites[16 * 5] = {
 	0x90, 0x90, 0xF0, 0x10, 0x10,
 	0xF0, 0x80, 0xF0, 0x10, 0xF0,
 	0xF0, 0x80, 0xF0, 0x90, 0xF0,
-	0xF0, 0x10, 0x20, 0x30, 0x40,
+	0xF0, 0x10, 0x20, 0x40, 0x40,
 	0xF0, 0x90, 0xF0, 0x90, 0xF0,
 	0xF0, 0x90, 0xF0, 0x10, 0xF0,
 	0xF0, 0x90, 0xF0, 0x90, 0x90,
@@ -42,6 +44,9 @@ uint32 doStep(State *state)
 	uint32 op;
 	readInstruction(&op, state->memory + state->PC);
 	state->PC += 2; // Should increment this before or after?
+
+	memset(state->modifiedAddresses, 0xFFFFFFFF, 16 * sizeof(uint32));
+	state->modifiedAddressesCount = 0;
 
 	uint32 opType;
 	getOpType(&opType, op);
@@ -260,6 +265,17 @@ void processOpType7(uint32 op, State *state)
 	state->V[X] += value;
 }
 
+void writeToMemory(State *state, uint32 address, byte value)
+{
+	state->memory[address] = value;
+	int count = state->modifiedAddressesCount;
+	if (count < 16)
+	{
+		state->modifiedAddresses[count] = address;
+		state->modifiedAddressesCount++;
+	}
+}
+
 void processOpType8(uint32 op, State *state)
 {
 	// 0x8XY? - Arithmetic
@@ -292,7 +308,7 @@ void processOpType8(uint32 op, State *state)
 	case 0x5: // VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
 		temp = state->V[X];
 		state->V[X] -= state->V[Y];
-		state->V[0xF] = temp < state->V[X];
+		state->V[0xF] = temp >= state->V[X];
 		break;
 	case 0x6: // Shifts VX right by one. VF is set to the value of the least significant bit of VX before the shift.
 		state->V[0xF] = state->V[X] & 0x0001;
@@ -366,14 +382,19 @@ void processOpTypeD(uint32 op, State *state)
 	Y = Y >> 4;
 	byte *address = state->memory + state->I;
 	uint32 rows = op & 0x000F;
-	byte posX = state->V[X];
+	byte initialPosX = state->V[X];
 	byte posY = state->V[Y];
 	byte changed = 0;
 	for (uint32 i = 0; i < rows; ++i)
 	{
 		byte toDraw = *address; // Here we have the byte to draw in a row
+		byte posX = initialPosX;
 		for (int p = 7; p >= 0; --p)
 		{
+			if (posX > 64)
+			{
+				posX = 0;
+			}
 			uint32 index = posY*DISPLAY_W + posX;
 			byte pixel = toDraw >> p;
 			pixel &= 0x01;
@@ -381,7 +402,6 @@ void processOpTypeD(uint32 op, State *state)
 			state->display[index] ^= pixel;
 			++posX;
 		}
-		posX -= 8;
 		++posY;
 		++address;
 	}
@@ -467,19 +487,19 @@ void processOpTypeF(uint32 op, State *state)
 		// (In other words, take the decimal representation of VX, place the 
 		// hundreds digit in memory at location in I, the tens digit at location I+1, 
 		// and the ones digit at location I+2.)
-		state->I = state->V[X] * 0x5;
+		//state->I = state->V[X] * 0x5;
 		temp = state->V[X];
 		digit = temp / 100;
-		state->memory[state->I] = digit;
+		writeToMemory(state, state->I, digit);
 		digit = temp % 100;
-		state->memory[state->I + 1] = digit / 10;
+		writeToMemory(state, state->I + 1, digit / 10);
 		digit = temp % 10;
-		state->memory[state->I + 2] = digit;
+		writeToMemory(state, state->I + 2, digit);
 		break;
 	case 0x55: // Stores V0 to VX in memory starting at address I.
 		for (uint32 i = 0; i <= X; i++)
 		{
-			state->memory[state->I + i] = state->V[i];
+			writeToMemory(state, state->I + i, state->V[i]);
 		}
 		break;
 	case 0x65: // Fills V0 to VX with values from memory starting at address I.

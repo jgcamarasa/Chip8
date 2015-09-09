@@ -8,7 +8,7 @@ void drawGUI(State *state, Controller *controller)
 {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::SetNextWindowSize(ImVec2(SIDE_PANEL_W, WIN_H), ImGuiSetCond_FirstUseEver);
-	ImGui::SetNextWindowPos(ImVec2(WIN_W - SIDE_PANEL_W, 0));
+	ImGui::SetNextWindowPos(ImVec2(WIN_W - SIDE_PANEL_W * 2, 0));
 	ImGui::Begin("Another Window", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 	ImGui::Text("PC: %#010x", state->PC);
 	uint32 op;
@@ -38,7 +38,18 @@ void drawGUI(State *state, Controller *controller)
 	ImGui::Text("14:  %d", (int)state->V[14]);
 	ImGui::Text("15:  %d", (int)state->V[15]);
 	ImGui::Columns(1);
-	ImGui::Text("I:  %d", (int)state->I);
+	ImGui::Text("I:  %#06x", (int)state->I);
+	ImGui::Separator();
+	ImGui::Text("Stack:");
+	int stackLevel = state->stackLevel;
+	for (int i = 0; i < stackLevel; ++i)
+	{
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%d:  %#06x", i, state->stack[i]);
+	}
+	for (int i = stackLevel; i < 8; ++i)
+	{
+		ImGui::Text("%d:  %#06x", i + stackLevel, state->stack[i + stackLevel]);
+	}
 	ImGui::Separator();
 	if (ImGui::Button(controller->status == CONTROLLER_STATUS_PAUSED ? "Run" : "Pause"))
 	{
@@ -54,27 +65,73 @@ void drawGUI(State *state, Controller *controller)
 	ImGui::SameLine();
 	if (ImGui::Button("Step"))
 	{
+		controller->status = CONTROLLER_STATUS_PAUSED;
 		doStep(controller->state);
 	}
 	ImGui::Text("Status: %s", controller->status == CONTROLLER_STATUS_PAUSED ? "Paused" : "Running");
 	ImGui::End();
 
-	ImGui::SetNextWindowSize(ImVec2(WIN_W - SIDE_PANEL_W, 200), ImGuiSetCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(WIN_W - SIDE_PANEL_W*2, 200), ImGuiSetCond_FirstUseEver);
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::SetNextWindowContentSize(ImVec2(WIN_W - SIDE_PANEL_W, 200));
+	ImGui::SetNextWindowContentSize(ImVec2(WIN_W - SIDE_PANEL_W*2, 200));
 	ImGui::Begin("Memory", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-	ImGui::BeginChildFrame(0, ImVec2(WIN_W - SIDE_PANEL_W, 160));
+	ImGui::BeginChildFrame(0, ImVec2(WIN_W - SIDE_PANEL_W*2-20, 160));
 	int rows = 256;
+	int modifiedCount = 0;
 	for (int i = 0; i < rows; ++i)
 	{
-		ImGui::Text("%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d",
-			state->memory[i * 15], state->memory[i * 15 + 1], state->memory[i * 15 + 2], state->memory[i * 15 + 3],
-			state->memory[i * 15 + 4], state->memory[i * 15 + 5], state->memory[i * 15 + 6], state->memory[i * 15 + 7],
-			state->memory[i * 15 + 8], state->memory[i * 15 + 9], state->memory[i * 15 + 10], state->memory[i * 15 + 11],
-			state->memory[i * 15 + 12], state->memory[i * 15 + 13], state->memory[i * 15 + 14], state->memory[i * 15 + 15]);
+		for (int j = 0; j < 15; j++)
+		{
+			if (modifiedCount < state->modifiedAddressesCount && state->modifiedAddresses[modifiedCount] == i * 15 + j)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%02X", state->memory[i * 15 + j]);
+				modifiedCount++;
+			}
+			else
+			{
+				ImGui::Text("%02X", state->memory[i * 15 + j]);
+			}
+			
+			ImGui::SameLine();
+		}
+		if (modifiedCount < state->modifiedAddressesCount && state->modifiedAddresses[modifiedCount] == i * 15 + 15)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%02X", state->memory[i * 15 + 15]);
+			modifiedCount++;
+		}
+		else
+		{
+			ImGui::Text("%02X", state->memory[i * 15 + 15]);
+		}
+		
 	}
 	
 	ImGui::EndChildFrame();
+	ImGui::End();
+
+	ImGui::SetNextWindowSize(ImVec2(SIDE_PANEL_W, WIN_H), ImGuiSetCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(WIN_W - SIDE_PANEL_W, 0));
+	ImGui::Begin("Code", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+	op;
+	
+	uint32 address = 0x200;
+	while (!(state->memory[address] == 0x00 && state->memory[address + 1] == 0x00))
+	{
+		readInstruction(&op, state->memory + address);
+		getOpString(op, string);
+		if (state->PC == address)
+		{
+			ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%#06x: %s", address, string);
+		}
+		else
+		{
+			ImGui::Text("%#06x: %s", address, string);
+		}
+		
+		address += 2;
+	}
+	
+
 	ImGui::End();
 }
 
@@ -153,7 +210,7 @@ void getOpStringType7(uint32 op, char *dest)
 	uint32 X = op & 0x0F00;
 	X = X >> 8;
 	uint32 value = op & 0x00FF;
-	sprintf(dest, "Skip if V%d+=%d", X, value);
+	sprintf(dest, "V%d+=%d", X, value);
 }
 
 void getOpStringType8(uint32 op, char *dest)
@@ -197,7 +254,7 @@ void getOpStringType8(uint32 op, char *dest)
 		break;
 	default:
 		sprintf(dest, "UNSUPPORTED");
-		assert(false);
+		//assert(false);
 		break;
 	}
 
@@ -217,7 +274,7 @@ void getOpStringTypeA(uint32 op, char *dest)
 {
 	// 0xANNN - Sets I to the address NNN.
 	uint32 address = op & 0x0FFF;
-	sprintf(dest, "I=V%#06x", address);
+	sprintf(dest, "I=%#06x", address);
 }
 
 void getOpStringTypeB(uint32 op, char *dest)
@@ -269,7 +326,7 @@ void getOpStringTypeE(uint32 op, char *dest)
 		break;
 	default:
 		sprintf(dest, "UNSUPPORTED");
-		assert(false);
+		//assert(false);
 	}
 }
 

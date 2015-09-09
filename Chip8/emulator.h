@@ -34,7 +34,7 @@ struct State
 {
 	byte memory[MAX_MEMORY];
 	byte V[16];				// V0-VF, Registers (8 bits). VF = Carry Flag
-	byte stack[64];			// Stack
+	uint32 stack[64];			// Stack
 	uint32 stackLevel;		// Current stack level
 	uint32 I;				// Address register (16 bits)
 	byte delayTimer;		// Delay timer TODO: Check if it's a byte or what
@@ -42,6 +42,9 @@ struct State
 	byte keyboard[16];		// Hex Keyboard. Keys from 0 to F
 	byte display[DISPLAY_W*DISPLAY_H];	// Byte used as a bool for each pixel
 	uint32 PC;				// Program counter
+
+	uint32 modifiedAddresses[16]; // For debugging
+	uint32 modifiedAddressesCount;
 };
 
 void initState(State *state);
